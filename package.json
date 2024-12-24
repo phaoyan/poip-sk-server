@@ -3,7 +3,10 @@
     "@solana/web3.js": "^1.98.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
+    "bs58": "^6.0.0",
     "chai-http": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1"
@@ -11,6 +14,7 @@
   "devDependencies": {
     "@types/bn.js": "^5.1.1",
     "@types/chai": "^4.3.5",
+    "@types/cors": "^2.8.17",
     "@types/mocha": "^10.0.1",
     "chai": "^4.3.8",
     "mocha": "^10.2.0",

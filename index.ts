@@ -1,41 +1,85 @@
 // index.ts
 import express from 'express';
+import cors from 'cors';
 import { Connection, PublicKey } from '@solana/web3.js';
-import crypto from 'crypto'; // 引入 Node.js 的加密模块
 import nacl from 'tweetnacl';
 import bs58 from "bs58"
+import 'dotenv/config';
+
+const corsOptions = {
+    origin: 'http://localhost:3000', // 允许来自 http://localhost:3000 的请求
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTION', // 允许的 HTTP 方法
+    credentials: true, // 如果需要跨域传递 cookie，则设置为 true
+    allowedHeaders: 'Content-Type,Authorization', // 允许的请求头
+};
+
+console.log("CORS配置：", corsOptions)
 
 const app = express();
-const port = 3000;
+const port = 4000;
 
+app.use(cors(corsOptions)); // 使用 cors 中间件
 app.use(express.json());
 
 // 环境变量 (在生产环境中考虑使用 .env 文件)
-const SOLANA_RPC_URL:    string = process.env.SOLANA_RPC_URL!;
-const PROGRAM_ID_STR:    string = process.env.PROGRAM_ID!; // 替换成你实际的程序 ID
-const DECRYPTION_KEY:    string = process.env.DECRYPTION_KEY!; // 用于对称解密的密钥
-const IP_ID:             string = process.env.IP_ID!; // 知识产权的 ID
-const ENCRYPTED_CONTENT: string = process.env.ENCRYPTED_CONTENT!; // 加密的知识产权内容（实际场景中可能从 IPFS 或 Arweave 获取）
-const IV_BASE64:         string = process.env.IV_BASE64!; // 初始化向量 (IV), Base64 编码
-
-// 检查必要的环境变量是否已设置
-if (!DECRYPTION_KEY || !IP_ID || !ENCRYPTED_CONTENT || !IV_BASE64) {
-    console.error("错误: 必须设置 DECRYPTION_KEY, IP_ID, ENCRYPTED_CONTENT 和 IV_BASE64 环境变量。");
-    process.exit(1);
-}
+const SOLANA_RPC_URL:       string = process.env.SOLANA_RPC_URL!;
+const PROGRAM_ID_STR:       string = process.env.PROGRAM_ID!; // 替换成你实际的程序 ID
+const KEYS_JSON:            string = process.env.KEYS_JSON!;
+const IVS_JSON:             string = process.env.IVS_JSON!;
 
 const PROGRAM_ID: PublicKey = new PublicKey(PROGRAM_ID_STR);
-const IV: Buffer = Buffer.from(IV_BASE64, 'base64'); // 将 Base64 编码的 IV 转换为 Buffer
-const ENCRYPTION_ALGORITHM = 'aes-256-cbc'; // 使用的对称加密算法
+const KEYS: Map<string, string> = new Map();
+const IVS: Map<string, string> = new Map();
+// 尝试从环境变量中加载解密密钥
+if (KEYS_JSON) {
+    try {
+        const parsedKeys: Record<string, string> = JSON.parse(KEYS_JSON);
+        for (const ipid in parsedKeys) {
+            KEYS.set(ipid, parsedKeys[ipid]);
+            console.log(`成功从环境变量加载解密密钥。IPID: ${ipid}, KEY: ${parsedKeys[ipid]}`);
+        }
+    } catch (error) {
+        console.error("解析 DECRYPTION_KEYS_JSON 环境变量失败:", error);
+    }
+} else {
+    console.warn("未设置 DECRYPTION_KEYS_JSON 环境变量，解密密钥将为空。");
+}
+// 尝试从环境变量中加载IV
+if (IVS_JSON) {
+    try {
+        const parsedIVs: Record<string, string> = JSON.parse(IVS_JSON);
+        for (const ipid in parsedIVs) {
+            IVS.set(ipid, parsedIVs[ipid]);
+            console.log(`成功从环境变量加载IV。IV: ${ipid}, KEY: ${parsedIVs[ipid]}`);
+        }
+    } catch (error) {
+        console.error("解析 IVS_JSON 环境变量失败:", error);
+    }
+} else {
+    console.warn("未设置 IVS_JSON 环境变量，IVs将为空。");
+}
+
 
 // 解密 POST 接口
 app.post('/decrypt', async (req: any, res: any) => {
-    const { buyerPublicKey, signature, message } = req.body;
+    const { buyerPublicKey, signature, message, ipid } = req.body;
 
     // 检查请求体中是否包含必要的参数
-    if (!buyerPublicKey || !signature || !message) {
+    if (!buyerPublicKey || !signature || !message || !ipid) {
         return res.status(400).send({ error: '请求体中缺少 buyerPublicKey, signature 或 message' });
     }
+
+    // 检查请求的 IPID 是否存在对应的解密密钥
+    if (!KEYS.has(ipid)) {
+        console.log(`未找到 IPID: ${ipid} 对应的解密密钥`);
+        return res.status(400).send({ error: `未找到 IPID: ${ipid} 对应的解密密钥` });
+    }
+
+    const key = KEYS.get(ipid);
+    const iv            = IVS.get(ipid);
+    console.log("处理请求...")
+    console.log(`KEY: ${key}`)
+    console.log(`IV:  ${iv}`)
 
     try {
 
@@ -53,8 +97,8 @@ app.post('/decrypt', async (req: any, res: any) => {
 
         // 连接到 Solana 网络
         const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
-        const buyerKey = new PublicKey(buyerPublicKey);
-        const ipIdBuffer = Buffer.from(IP_ID, 'utf8');
+        const buyerKey   = new PublicKey(buyerPublicKey);
+        const ipIdBuffer = Buffer.from(ipid, 'utf8');
 
         // 推导合约发行账户 (CIAccount) 的 PDA 地址
         const [ciAccountPublicKey, _ciAccountBump] = PublicKey.findProgramAddressSync(
@@ -75,14 +119,9 @@ app.post('/decrypt', async (req: any, res: any) => {
         if (cpAccountInfo) {
             // 购买已验证，进行解密操作
             console.log(`已验证购买者: ${buyerPublicKey}`);
-
-            // 创建解密器
-            const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, DECRYPTION_KEY, IV);
-            let decrypted = decipher.update(ENCRYPTED_CONTENT, 'base64', 'utf8'); // 指定输入编码为 base64，输出编码为 utf8
-            decrypted += decipher.final('utf8');
-
+            console.log(`发送密钥： ${key} ; IV: ${iv}`)
             // 发送解密后的内容
-            res.send({ decryptedContent: decrypted });
+            res.send({ key: key, iv: iv });
         } else {
             // 未找到购买记录
             console.log(`未找到购买者: ${buyerPublicKey} 的购买记录`);
