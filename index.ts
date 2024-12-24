@@ -98,11 +98,10 @@ app.post('/decrypt', async (req: any, res: any) => {
         // 连接到 Solana 网络
         const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
         const buyerKey   = new PublicKey(buyerPublicKey);
-        const ipIdBuffer = Buffer.from(ipid, 'utf8');
 
         // 推导合约发行账户 (CIAccount) 的 PDA 地址
         const [ciAccountPublicKey, _ciAccountBump] = PublicKey.findProgramAddressSync(
-            [Buffer.from('ci', 'utf8'), ipIdBuffer],
+            [Buffer.from('ci', 'utf8'), new PublicKey(ipid).toBuffer()],
             PROGRAM_ID
         );
 
