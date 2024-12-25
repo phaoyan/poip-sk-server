@@ -59,6 +59,15 @@ if (IVS_JSON) {
     console.warn("未设置 IVS_JSON 环境变量，IVs将为空。");
 }
 
+app.post('/ping', async (req: any, res: any)=>{
+    const {ipid} = req.body
+    if(KEYS.has(ipid)){
+        return res.send({ success: true });
+    } else {
+        console.log(`IPID ${ipid} 的密钥服务尚未配置`);
+        return res.status(500).send({ error: `IPID ${ipid} 的密钥服务尚未配置` });
+    }
+})
 
 // 解密 POST 接口
 app.post('/decrypt', async (req: any, res: any) => {
