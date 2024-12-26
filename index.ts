@@ -8,7 +8,7 @@ import 'dotenv/config';
 import path from 'path';
 
 // Environment variables (consider using .env files in production)
-const PORT: number = parseInt(process.env.PORT!);
+const PORT:                 number = parseInt(process.env.PORT!);
 const WEBSITE_URL:          string = process.env.WEBSITE_URL!;
 const SOLANA_RPC_URL:       string = process.env.SOLANA_RPC_URL!;
 const PROGRAM_ID_STR:       string = process.env.PROGRAM_ID!; // Replace with your actual program ID
