@@ -1,5 +1,5 @@
 # 使用官方的 Node.js 镜像作为基础镜像
-FROM node:18-alpine AS builder
+FROM node:latest AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -29,7 +29,7 @@ RUN if [ -f "yarn.lock" ]; then yarn install --frozen-lockfile; else npm install
 RUN npm run build
 
 # --- 第二阶段：运行镜像 ---
-FROM node:18-alpine
+FROM node:latest  
 
 # 设置工作目录
 WORKDIR /app
@@ -44,9 +44,10 @@ COPY index.ts .
 COPY --from=builder /app/client/dist ./client/dist
 
 # 暴露你的 Node.js 服务端口
-EXPOSE 3000 
+EXPOSE 6415
 
 # 定义启动命令
-CMD ["node", "dist/index.js"] # 假设 TypeScript 编译后输出到 dist 目录
+# CMD ["node", "-v"]
+CMD ["node","dist/index.js"]
 # 如果你没有编译 TypeScript，并且直接运行 index.ts，则使用：
 # CMD ["node", "index.ts"] # 注意：生产环境通常建议先编译
