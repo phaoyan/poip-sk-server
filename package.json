@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@docusaurus/core": "^3.6.3",
+    "@docusaurus/preset-classic": "^3.6.3",
     "@solana/web3.js": "^1.98.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
@@ -8,6 +10,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "next-compose-plugins": "^2.2.1",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1"
   },
