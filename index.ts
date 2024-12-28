@@ -6,6 +6,7 @@ import nacl from 'tweetnacl';
 import bs58 from "bs58"
 import 'dotenv/config';
 import path from 'path';
+import * as borsh from 'borsh'; // You can use borsh for easier deserialization
 
 // Environment variables (consider using .env files in production)
 const PORT:                 number = 6415
@@ -29,6 +30,41 @@ console.log("CORS Configuration:", corsOptions)
 const app = express();
 app.use(cors(corsOptions)); // Use cors middleware
 app.use(express.json());
+
+type  IPUNKNOWN    = 0
+type  IPPrivate    = 1
+type  IPPublished  = 2
+type  IPPublic     = 3
+const IP_PUBLIC    = 3
+type IPOwnership   = IPUNKNOWN | IPPrivate | IPPublished | IPPublic
+
+const getOwnership = async (ipAccount: PublicKey): Promise<IPOwnership>=> {
+  const connection = new Connection(SOLANA_RPC_URL);
+  const accountPublicKey = ipAccount
+
+  try {
+    const accountInfo = await connection.getAccountInfo(accountPublicKey);
+
+    if (!accountInfo) {
+      console.error('Account not found.');
+      return 0;
+    }
+
+    const accountData = accountInfo.data;
+
+    // **Manual Deserialization (for ownership only):**
+    const ownershipBuffer = accountData;
+    const ownership = ownershipBuffer.toJSON().data[8]
+    console.log("Buffer: ", ownershipBuffer.toJSON())
+    console.log("Ownership: ", ownership)
+
+    return Number(ownership) as IPOwnership; // Or return the full deserialized object if needed
+  } catch (error) {
+    console.error('Error fetching account:', error);
+    return 0;
+  }
+}
+
 
 // Authentication middleware
 const authenticate = (req: any, res: any, next: any) => {
@@ -153,8 +189,12 @@ app.post('/decrypt', async (req: any, res: any) => {
         // Get CPAccount information
         const cpAccountInfo = await connection.getAccountInfo(cpAccountPublicKey);
 
+        // Get IP Ownership
+        const ipAccount = PublicKey.findProgramAddressSync([Buffer.from("ip"), new PublicKey(ipid).toBuffer()], PROGRAM_ID)[0]
+        const ownership = await getOwnership(ipAccount);
+
         // Verify if the purchase record exists
-        if (cpAccountInfo) {
+        if (ownership === IP_PUBLIC || cpAccountInfo) {
             // Purchase verified, proceed with decryption
             console.log(`Verified buyer: ${buyerPublicKey}`);
             console.log(`Sending key: ${key} ; IV: ${iv}`)
